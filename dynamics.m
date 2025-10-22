@@ -1,32 +1,44 @@
-function [A, B, C, D] = drone(I,T)
+%Grey-box modeli (p,q,r domain)
+% States: x = [p q r]^T
+% xdot = A x + B u
+% A = diag(-dphi/Ixx, -dtheta/Iyy, -dyaw/Izz)
+% B = diag(kphi/Ixx, ktheta/Iyy, kpsi/Izz)
+function [A,B,C,D] = bodyrate_model(par,~,Ts)
+    Ixx = par(1); Iyy = par(2); Izz = par(3);
+    dph = par(4); dth = par(5); dps = par(6);
+    kph = par(7); kth = par(8); kps = par(9);
 
-    A = [0 1 0 0 0 0;
-         0 0 0 0 0 0;
-         0 0 0 1 0 0;
-         0 0 0 0 0 0;
-         0 0 0 0 0 1;
-         0 0 0 0 0 0];
+    Ac = diag([-dph/Ixx, -dth/Iyy, -dps/Izz]);
+    Bc = diag([ kph/Ixx,  kth/Iyy,  kps/Izz]);
 
-    B = [0 0 0 0;
-         0 1/I(1) 0 0;
-         0 0 0 0;
-         0 0 1/I(2) 0;
-         0 0 0 0;
-         0 0 0 1/I(3)];
-
-    C = eye(6); % Define the output matrix C as an identity matrix (y = C x) (xdot = A x + B u) (x [phi phidot theta thetadot psi psidot])
-    D = zeros(6,4);
-
+    % Discrete eşdeğer (Euler forward yeterli, küçük Ts)
+    A = eye(3) + Ts*Ac;
+    B = Ts*Bc;
+    C = eye(3);
+    D = zeros(3,3);
 end
 
-lr=0.7;
-Ixx=1.1*(4*3*lr^2);
-Iyy=1.1*(4*3*lr^2);
-Izz=2*Ixx;
-I = [Ixx; Iyy; Izz]; % Atalet matrisi
-aux = {};
-T = 0.0035;
+Msphere = 25.0; %atalet, bir küresel kütle yoğunluğunun merkezinden yaklaşık olarak tahmin edilebilir (Dynamic Modelling of a Quadrotor Aerial Vehicle with Nonlinear Inputs Article)
+Mrotor = 2.8; %rotorun point mass 
+r = 1.02; %dronun yarıçapı 
+lr = 1.02; %motorun ağırlık merkezine uzaklığı
 
-sys_dy = idgrey(@drone, I, 'd', aux, T)
+I0 = (2/5)*Msphere*r_^2 + 2*(lr^2)*Mrot;  % Ixx≈Iyy
+Ixx0 = I0;
+Iyy0 = I0;
+Izz0 = (2/5)*Msphere*r_^2 + 4*(lr^2)*Mrot;
 
-sys = greyest(data, sys_dy)
+par0 = [Ixx0, Iyy0, Izz0,  % inertialar
+        5.0,  5.0,  5.0,   % sönüm (tune edilmek üzere)
+        1.0,  1.0,  1.0];  % PWM→tork ölçekleri
+
+sys0 = idgrey(@bodyrate_model, par0, 'd', Ts);
+
+% Pozitif kısıtlar
+lb = [ 1,   1,   1,   0,   0,   0,   0,   0,   0];
+ub = [200, 200, 400, 200, 200, 200, 100, 100, 100];  % geniş tut
+
+opt = greyestOptions('EnforceStability',true, 'Display','on');
+sys  = greyest(data, sys0, opt, 'InitialState','zero', 'Lower',lb, 'Upper',ub);
+
+compare(data, sys);
