@@ -25,7 +25,7 @@ if isempty(takeoff_time) || takeoff_time==0
     error('vehicle_status.takeoff_time bulunamadı (hep 0). Uçuş olmayan bir log olabilir.');
 end
 
-takeoff_time = seconds(double(takeoff_time) * 1e-6);   % ★ uint64 -> duration
+takeoff_time = seconds(double(takeoff_time) * 1e-6);   %duration yap
 
 % p,q,r matrisleri, motor itkisi ve zamanlar
 meas_pqr = [ang_vel_meas.xyz(:,1) ang_vel_meas.xyz(:,2) ang_vel_meas.xyz(:,3)];
@@ -35,7 +35,7 @@ t_meas   = ang_vel_meas.timestamp;
 t_sp     = rate_sp.timestamp;
 t_thrust = motors.timestamp;
 
-%takeoffdan sonraki timestampleri al
+%takeoffdan sonraki timestampleri al ve saniyeye çevir
 idx_meas = t_meas >= takeoff_time;
 idx_sp = t_sp >= takeoff_time;
 idx_thrust = t_thrust >= takeoff_time;
@@ -43,9 +43,9 @@ idx_thrust = t_thrust >= takeoff_time;
 meas_pqr = meas_pqr(idx_meas,:);
 sp_pqr = sp_pqr(idx_sp,:);
 thrust_sp = thrust_sp(idx_thrust,:);
-t_meas = t_meas(idx_meas);
-t_sp = t_sp(idx_sp);
-t_thrust = t_thrust(idx_thrust,:);
+t_meas   = ang_vel_meas.timestamp(idx_meas);
+t_sp     = rate_sp.timestamp(idx_sp);
+t_thrust = motors.timestamp(idx_thrust);
 
 % ölçüm, setpoint ve thrust timetable oluştur
 TT_meas = array2timetable(meas_pqr,'RowTimes',t_meas,'VariableNames',{'p_meas','q_meas','r_meas'});
@@ -65,22 +65,12 @@ u2 = TT_thrust.motor3 - TT_thrust.motor1 + TT_thrust.motor2 - TT_thrust.motor4; 
 u3 = TT_thrust.motor3 + TT_thrust.motor1 - TT_thrust.motor2 - TT_thrust.motor4; %pitch hareketi
 u4 = TT_thrust.motor3 - TT_thrust.motor1 - TT_thrust.motor2 + TT_thrust.motor4; %yaw hareketi
 
-TT_u = timetable(TT_thrust.Time, u2, u3, u4, 'VariableNames',{'u_roll','u_pitch','u_yaw'});
+TT_u = timetable(t_thrust, u2, u3, u4, 'VariableNames',{'u_roll','u_pitch','u_yaw'});
 
-%zamanı duartion yap
-%dt_meas = mean(seconds(diff(TT_meas.Time)));
-%freq_meas = 1 / dt_meas;
-%t = duration([zeros(length(TT_meas.Time),1) zeros(length(TT_thrust.Time),1) (0:1/freq_meas:(length(TT_meas.Time)-1)/freq_meas)'], 'Format', 'hh:mm:ss.SSS');
-
-%timetabelları birleştir
-%TT_unified = timetable(t, u1, u2, u3, u4, TT_meas.p_meas, TT_meas.q_meas, TT_meas.r_meas, TT_meas.pdot_meas, TT_meas.qdot_meas, TT_meas.rdot_meas, 'VariableNames', {'u1','u2','u3','u4','p_meas','q_meas','r_meas','pdot_meas','qdot_meas','rdot_meas'});
-
-%senkronizasyon
+%iddata oluştur
 Ts = 0.0035;
-TT = synchronize(TT_meas, TT_u, 'intersection');
-TT = retime(TT,'regular','pchip','TimeStep',seconds(Ts));
 
-y = [TT.p_meas, TT.q_meas, TT.r_meas];
-u = [TT.u_roll, TT.u_pitch, TT.u_yaw];
+y = [TT_meas.p_meas, TT_meas.q_meas, TT_meas.r_meas];
+u = [TT_u.u_roll, TT_u.u_pitch, TT_u.u_yaw];
 
 data = iddata(y,u,Ts,'InputName',{'tau_r','tau_p','tau_y'},'OutputName',{'p','q','r'});

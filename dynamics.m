@@ -23,22 +23,18 @@ Mrotor = 2.8; %rotorun point mass
 r = 1.02; %dronun yarıçapı 
 lr = 1.02; %motorun ağırlık merkezine uzaklığı
 
-I0 = (2/5)*Msphere*r_^2 + 2*(lr^2)*Mrot;  % Ixx≈Iyy
+I0 = (2/5)*Msphere*r^2 + 2*(lr^2)*Mrotor;  % Ixx≈Iyy
 Ixx0 = I0;
 Iyy0 = I0;
-Izz0 = (2/5)*Msphere*r_^2 + 4*(lr^2)*Mrot;
+Izz0 = (2/5)*Msphere*r^2 + 4*(lr^2)*Mrotor;
 
 par0 = [Ixx0, Iyy0, Izz0,  % inertialar
         5.0,  5.0,  5.0,   % sönüm (tune edilmek üzere)
         1.0,  1.0,  1.0];  % PWM→tork ölçekleri
 
-sys0 = idgrey(@bodyrate_model, par0, 'd', Ts);
-
-% Pozitif kısıtlar
-lb = [ 1,   1,   1,   0,   0,   0,   0,   0,   0];
-ub = [200, 200, 400, 200, 200, 200, 100, 100, 100];  % geniş tut
+sys0 = idgrey(@bodyrate_model, par0, 'd', Ts)
 
 opt = greyestOptions('EnforceStability',true, 'Display','on');
-sys  = greyest(data, sys0, opt, 'InitialState','zero', 'Lower',lb, 'Upper',ub);
+sys  = greyest(data, sys0, opt, 'InitialState','zero')
 
 compare(data, sys);
