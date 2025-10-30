@@ -152,7 +152,7 @@ function [A,B,C,D] = bodyrate_model(par,~,Ts)
 end
 
 % Başlangıç parametreleri (seninkilerle uyumlu)
-Msphere=25.0; Mrotor=2.8; r=1.02; lr=1.02;
+Msphere=25.0; Mrotor=2.8; r=1.085; lr=1.085;
 I0   = (2/5)*Msphere*r^2 + 2*(lr^2)*Mrotor;  % Ixx≈Iyy
 Ixx0 = I0; Iyy0 = I0; Izz0 = (2/5)*Msphere*r^2 + 4*(lr^2)*Mrotor;
 
